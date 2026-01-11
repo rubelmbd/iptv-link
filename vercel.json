@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/play/:path*",
+      "destination": "/api/proxy"
+    }
+  ]
+}
