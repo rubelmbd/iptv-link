@@ -3,10 +3,10 @@ export const config = {
 };
 
 export default async (request) => {
-  const targetBase = "http://163.61.227.29";
+  const targetBase = "http://163.61.227.29"; // আপনার IPTV IP
   const url = new URL(request.url);
   
-  // আসল আইপিটিভি লিঙ্ক তৈরি
+  // আসল লিঙ্কের পাথ তৈরি করা
   const targetUrl = targetBase + url.pathname + url.search;
 
   try {
@@ -14,31 +14,38 @@ export default async (request) => {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": targetBase + "/",
-      },
+        "X-Forwarded-For": "103.145.2.20" // বাংলাদেশি আইপি মাস্কিং
+      }
     });
+
+    if (!response.ok) {
+      return new Response(`IPTV Server Response Error: ${response.status}`, { status: response.status });
+    }
 
     const contentType = response.headers.get("content-type") || "";
 
-    // যদি m3u8 ফাইল হয়, তবে লিঙ্কগুলো HTTPS ডোমেইন দিয়ে রিপ্লেস করা
+    // যদি m3u8 ফাইল হয় তবে ভিতরের লিঙ্ক পরিবর্তন
     if (url.pathname.endsWith(".m3u8") || contentType.includes("mpegurl")) {
       let text = await response.text();
-      const origin = `${url.protocol}//${url.host}/api/proxy`;
+      const origin = `${url.protocol}//${url.host}`;
       
-      // সব http লিঙ্ককে Vercel ডোমেইন দিয়ে রিপ্লেস করা
-      const modifiedText = text.replaceAll(targetBase, origin);
+      // গুরুত্বপূর্ণ: এই লাইনটি আপনার Mixed Content এরর দূর করবে
+      const modifiedText = text.split(targetBase).join(origin);
 
       return new Response(modifiedText, {
         headers: {
           "content-type": "application/vnd.apple.mpegurl",
           "access-control-allow-origin": "*",
+          "cache-control": "no-cache"
         },
       });
     }
 
-    // ভিডিও চাঙ্ক (.ts) সরাসরি রিটার্ন করা
+    // ভিডিও চাঙ্ক সরাসরি পাস করা
     return response;
 
   } catch (err) {
-    return new Response("Error: " + err.message, { status: 500 });
+    // এই এরর মেসেজটি আপনাকে বলবে আসলে কী সমস্যা হচ্ছে
+    return new Response("Proxy Connection Failed: " + err.message, { status: 500 });
   }
 };
