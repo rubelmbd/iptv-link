@@ -2,16 +2,17 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/play/:path*",
-      "destination": "http://163.61.227.29:8000/play/:path*"
+      "source": "/iptv-stream/:path*",
+      "destination": "http://163.61.227.29:8000/:path*"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/iptv-stream/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS" }
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Accept, Range" }
       ]
     }
   ]
