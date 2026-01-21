@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-    // ডাইনামিক পাথ সংগ্রহ (যেমন: play/a03p/index.m3u8)
     const { path } = req.query;
     
     if (!path) {
@@ -7,47 +6,51 @@ export default async function handler(req, res) {
     }
 
     const baseUrl = "http://163.61.227.29:8000";
-    // পাথের শুরুর অপ্রয়োজনীয় স্ল্যাশ পরিষ্কার করা
     const cleanPath = path.replace(/^\/+/, '');
     const targetUrl = `${baseUrl}/${cleanPath}`;
 
     try {
         const response = await fetch(targetUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': baseUrl
+                // VLC এবং Televizo এর জন্য উপযোগী User-Agent
+                'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+                'Accept': '*/*',
+                'Connection': 'keep-alive'
             }
         });
 
         if (!response.ok) {
             return res.status(response.status).json({ 
                 error: "Source Server Error", 
-                status: response.status,
-                requestedUrl: targetUrl 
+                status: response.status 
             });
         }
 
-        // CORS Headers সেট করা যাতে আপনার ওয়েবসাইট থেকে প্লে হয়
+        // গুরুত্বপূর্ণ হেডারস
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
 
-        // যদি এটি ভিডিও ফাইল (.ts) হয়
+        // যদি ভিডিও ডাটা (.ts) হয়
         if (cleanPath.endsWith('.ts')) {
             const arrayBuffer = await response.arrayBuffer();
             res.setHeader('Content-Type', 'video/mp2t');
-            res.setHeader('Cache-Control', 'public, max-age=86400');
+            // ভিডিও ফাইল ক্যাশে করা যেন বাফারিং কম হয়
+            res.setHeader('Cache-Control', 'public, max-age=3600'); 
             return res.status(200).send(Buffer.from(arrayBuffer));
         }
 
-        // যদি এটি প্লেলিস্ট (.m3u8) হয়
+        // যদি প্লেলিস্ট (.m3u8) হয়
         const text = await response.text();
         const host = req.headers.host;
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
         
-        // প্লেলিস্টের ভেতরের সব HTTP লিঙ্ককে আমাদের প্রক্সির মাধ্যমে ঘুরিয়ে দেওয়া
-        // এটি Mixed Content সমস্যার চূড়ান্ত সমাধান
-        const fixedContent = text.replace(/http:\/\/163\.61\.227\.29:8000\//g, `https://${host}/stream/`);
+        // প্লেলিস্টের ভেতরে থাকা সব লিঙ্ককে ডাইনামিকলি প্রক্সি ইউআরএলে রূপান্তর
+        // এখানে Regex আপডেট করা হয়েছে যাতে স্ল্যাশ থাকলেও সমস্যা না হয়
+        const fixedContent = text.replace(/http:\/\/163\.61\.227\.29:8000\//g, `${protocol}://${host}/stream/`);
 
-        res.setHeader('Content-Type', 'application/x-mpegURL');
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl'); // Standard M3U8 MIME
+        res.setHeader('Cache-Control', 'no-store'); // প্লেলিস্ট ক্যাশে করা যাবে না
         res.status(200).send(fixedContent);
 
     } catch (error) {
