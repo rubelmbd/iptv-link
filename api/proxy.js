@@ -1,7 +1,4 @@
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
-    // ডাইনামিক পাথ সংগ্রহ (যেমন: play/a03p/index.m3u8)
     const { path } = req.query;
     
     if (!path) {
@@ -12,32 +9,35 @@ export default async function handler(req, res) {
     const targetUrl = `${baseUrl}/${path}`;
 
     try {
-        const response = await fetch(targetUrl, {
-            headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' }
-        });
+        const response = await fetch(targetUrl);
 
-        // CORS হেডার সেট করা
+        if (!response.ok) {
+            throw new Error(`Failed to fetch from source: ${response.status}`);
+        }
+
+        // CORS Headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-        // যদি এটি ভিডিও ফাইল (.ts) হয়, তবে সরাসরি স্ট্রিম করুন
+        // যদি ভিডিও ফাইল (.ts) হয়
         if (path.endsWith('.ts')) {
+            const arrayBuffer = await response.arrayBuffer();
             res.setHeader('Content-Type', 'video/mp2t');
-            return response.body.pipe(res);
+            return res.status(200).send(Buffer.from(arrayBuffer));
         }
 
-        // যদি এটি m3u8 ফাইল হয়, তবে ভেতরের লিঙ্কগুলো ঠিক করতে হবে
+        // যদি প্লেলিস্ট (.m3u8) হয়
         const text = await response.text();
         const host = req.headers.host;
         
-        // ভেতরের সব লিঙ্ককে আমাদের প্রক্সির মাধ্যমে ঘুরিয়ে দেওয়া
-        // এটি Mixed Content এর স্থায়ী সমাধান
+        // সব HTTP লিঙ্ককে নিজের ডোমেইনের HTTPS লিঙ্কে কনভার্ট করা
         const fixedContent = text.replace(/http:\/\/163\.61\.227\.29:8000\//g, `https://${host}/stream/`);
 
         res.setHeader('Content-Type', 'application/x-mpegURL');
         res.status(200).send(fixedContent);
 
     } catch (error) {
-        res.status(500).send("Proxy Error: " + error.message);
+        console.error(error);
+        res.status(500).json({ error: "Stream Error", details: error.message });
     }
 }
