@@ -1,9 +1,5 @@
 {
-  "version": 2,
   "rewrites": [
-    {
-      "source": "/stream/(.*)",
-      "destination": "/api/play?path=$1"
-    }
+    { "source": "/api/stream", "destination": "/api/stream" }
   ]
 }
