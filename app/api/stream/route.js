@@ -1,8 +1,8 @@
 // app/api/stream/route.js
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';  // caching বন্ধ রাখে
-export const maxDuration = 300;           // Pro plan-এ কাজ করে, Hobby-তে partial
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -12,7 +12,7 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Path missing' }, { status: 400 });
   }
 
-  path = path.replace(/^\/+/, '');  // leading / remove
+  path = path.replace(/^\/+/, '');
   const baseUrl = 'http://163.61.227.29:8000';
   const targetUrl = `${baseUrl}/${path}`;
 
@@ -28,34 +28,23 @@ export async function GET(request) {
 
     if (!upstreamRes.ok) {
       return NextResponse.json(
-        { error: `Upstream failed: ${upstreamRes.status} ${upstreamRes.statusText}` },
+        { error: `Upstream: ${upstreamRes.status}` },
         { status: upstreamRes.status }
       );
     }
 
-    // Headers setup
     const headers = new Headers(upstreamRes.headers);
     headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
-    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    headers.set('Connection', 'keep-alive');
+    headers.set('Cache-Control', 'no-cache, no-store');
 
-    // IPTV-specific Content-Type
-    const lowerPath = path.toLowerCase();
-    if (lowerPath.endsWith('.ts') || lowerPath.includes('.ts?')) {
+    if (path.toLowerCase().endsWith('.ts')) {
       headers.set('Content-Type', 'video/mp2t');
-    } else if (lowerPath.endsWith('.m3u8') || lowerPath.includes('.m3u8?')) {
+    } else if (path.toLowerCase().endsWith('.m3u8')) {
       headers.set('Content-Type', 'application/vnd.apple.mpegurl');
     }
 
-    // Direct stream proxy (no buffering)
-    return new NextResponse(upstreamRes.body, {
-      status: upstreamRes.status,
-      headers,
-    });
-
+    return new NextResponse(upstreamRes.body, { status: upstreamRes.status, headers });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json({ error: error.message || 'Proxy failed' }, { status: 502 });
+    return NextResponse.json({ error: error.message }, { status: 502 });
   }
 }
