@@ -6,38 +6,48 @@ export default async function handler(req, res) {
     }
 
     const baseUrl = "http://163.61.227.29:8000";
-    const targetUrl = `${baseUrl}/${path}`;
+    // Path-এর শুরুতে যদি / থাকে তবে তা সরিয়ে ফেলা
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    const targetUrl = `${baseUrl}/${cleanPath}`;
 
     try {
-        const response = await fetch(targetUrl);
+        const response = await fetch(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Referer': baseUrl,
+                'Origin': baseUrl
+            }
+        });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch from source: ${response.status}`);
+            // যদি ৪MD বা অন্য কোনো এরর আসে তবে সেটি ডিটেইলসহ দেখাবে
+            return res.status(response.status).json({ 
+                error: "Source Server Error", 
+                status: response.status,
+                requestedUrl: targetUrl 
+            });
         }
 
-        // CORS Headers
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET');
-
-        // যদি ভিডিও ফাইল (.ts) হয়
-        if (path.endsWith('.ts')) {
+        
+        // .ts ভিডিও ফাইল হলে
+        if (cleanPath.endsWith('.ts')) {
             const arrayBuffer = await response.arrayBuffer();
             res.setHeader('Content-Type', 'video/mp2t');
             return res.status(200).send(Buffer.from(arrayBuffer));
         }
 
-        // যদি প্লেলিস্ট (.m3u8) হয়
+        // .m3u8 প্লেলিস্ট হলে
         const text = await response.text();
         const host = req.headers.host;
         
-        // সব HTTP লিঙ্ককে নিজের ডোমেইনের HTTPS লিঙ্কে কনভার্ট করা
+        // সব লিঙ্ককে HTTPS প্রক্সি লিঙ্কে রূপান্তর
         const fixedContent = text.replace(/http:\/\/163\.61\.227\.29:8000\//g, `https://${host}/stream/`);
 
         res.setHeader('Content-Type', 'application/x-mpegURL');
         res.status(200).send(fixedContent);
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Stream Error", details: error.message });
+        res.status(500).json({ error: "Proxy Crash", details: error.message });
     }
 }
