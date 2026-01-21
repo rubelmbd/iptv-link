@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/stream/(.*)",
-      "destination": "/api/proxy?path=$1"
-    }
-  ]
-}
-
